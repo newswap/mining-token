@@ -1,0 +1,5 @@
+/node_modules/
+/build/
+
+.secret_test
+.secret_dev
