@@ -132,7 +132,7 @@ contract TokenMine is Ownable {
 
         if(miningFee > 0){
             // TODO 确定此处owner收到了new
-            Address.sendValue(address(uint160(owner())), miningFee);
+            Address.sendValue(payable(owner()), miningFee);
         }
 
         user.rewardDebt = user.amount.mul(accTokenPerShare).div(1e12);
