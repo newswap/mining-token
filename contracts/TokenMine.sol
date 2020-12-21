@@ -44,6 +44,8 @@ contract TokenMine is Ownable {
     uint256 public rewardsTokenSupply;
     // reward tokens created per block.
     uint256 public rewardsTokenPerBlock;
+    // owner transfer rewardAmount
+    uint256 public rewardAmount;
 
     // The block number when New mining finish.
     uint256 public endBlock;
@@ -74,6 +76,7 @@ contract TokenMine is Ownable {
         rewardsToken = IERC20(_rewardsToken);
         lastRewardBlock = _startBlock;
         endBlock = _endBlock;
+        rewardAmount = _rewardAmount;
         rewardsTokenPerBlock = _rewardAmount.div(_endBlock.sub(_startBlock));
         miningFee = _miningFee;
 
@@ -87,8 +90,12 @@ contract TokenMine is Ownable {
         }
         uint256 stakingSupply = stakingToken.balanceOf(address(this));
         if (stakingSupply == 0) {
-            // TODO 此处需要注释掉，否则某些区块没有人挖矿，这些区块对应的矿就永远被锁在合约里了
-            // lastRewardBlock = block.number;
+            // 当没有人挖并且还有rewardsToken未分配出去，endblock顺延对应区块数   
+            if (rewardAmount.sub(rewardsTokenSupply) >= rewardsTokenPerBlock) {
+                endBlock = endBlock.add(block.number.sub(lastRewardBlock));
+            }
+
+            lastRewardBlock = block.number;
             return;
         }
 
@@ -113,7 +120,6 @@ contract TokenMine is Ownable {
     //       function for Miner                      //
     ///////////////////////////////////////////////////
 
-    // 收割用这个函数或withdraw，_amount=0即可
     // Deposit LP tokens to NewMine for NEW allocation.
     function deposit(uint256 _amount) public payable {
         UserInfo storage user = userInfo[msg.sender];
@@ -128,11 +134,11 @@ contract TokenMine is Ownable {
         if(_amount > 0) {
             stakingToken.safeTransferFrom(address(msg.sender), address(this), _amount);
             user.amount = user.amount.add(_amount);
-        }
 
-        if(miningFee > 0){
-            // TODO 确定此处owner收到了new
-            Address.sendValue(payable(owner()), miningFee);
+            // 用户提现也会调用改函数，此时不收费
+            if(miningFee > 0){
+                Address.sendValue(payable(owner()), miningFee);
+            }
         }
 
         user.rewardDebt = user.amount.mul(accTokenPerShare).div(1e12);
@@ -182,9 +188,9 @@ contract TokenMine is Ownable {
     function safeRewardsTokenTransfer(address _to, uint256 _amount) internal {
         uint256 bal = rewardsToken.balanceOf(address(this));
         if (_amount > bal) {
-            stakingToken.safeTransfer(_to, bal);
+            rewardsToken.safeTransfer(_to, bal);
         } else {
-            stakingToken.safeTransfer(_to, _amount);
+            rewardsToken.safeTransfer(_to, _amount);
         }
     }
 }

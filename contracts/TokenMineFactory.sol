@@ -40,7 +40,7 @@ contract TokenMineFactory is Ownable {
         uint256 _startBlock, 
         uint256 _endBlock, 
         uint256 _rewardAmount, 
-        uint256 _miningFee) public onlyOwner returns (address) {
+        uint256 _miningFee) public returns (address) {
 
         address tokenMine = address(new TokenMine(msg.sender, _name, _stakingToken, _rewardsToken, _startBlock, _endBlock, _rewardAmount, _miningFee));
 
