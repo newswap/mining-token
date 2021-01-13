@@ -120,7 +120,7 @@ contract TokenMine is Ownable {
     //       function for Miner                      //
     ///////////////////////////////////////////////////
 
-    // Deposit LP tokens to NewMine for NEW allocation.
+    // Deposit LP tokens to TokenMine for token allocation.
     function deposit(uint256 _amount) public payable {
         UserInfo storage user = userInfo[msg.sender];
         updatePool();
@@ -134,19 +134,18 @@ contract TokenMine is Ownable {
         if(_amount > 0) {
             stakingToken.safeTransferFrom(address(msg.sender), address(this), _amount);
             user.amount = user.amount.add(_amount);
-
-            // 用户提现也会调用改函数，此时不收费
-            if(miningFee > 0){
-                Address.sendValue(payable(owner()), miningFee);
-            }
         }
 
         user.rewardDebt = user.amount.mul(accTokenPerShare).div(1e12);
+
+        // 用户提现也会调用此函数，此时不收费
+        if(_amount > 0 && miningFee > 0) {
+            Address.sendValue(payable(owner()), miningFee);  
+        }
         emit Deposit(msg.sender, _amount);        
     }
 
-    // 收割用这个函数或deposit，_amount=0即可
-    // Withdraw LP tokens from NewMine.
+    // Withdraw LP tokens from TokenMine.
     function withdraw(uint256 _amount) public {
         UserInfo storage user = userInfo[msg.sender];
         require(user.amount >= _amount, "withdraw: not good");
