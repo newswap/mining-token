@@ -3,11 +3,10 @@ pragma solidity 0.6.12;
 
 import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
-import "@openzeppelin/contracts/utils/Address.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 
-// TokenMine is the master of NewFarm. He can distribute New and he is a fair guy.
+// TokenMine is the user-defined mining. He can distribute token and he is a fair guy.
 contract TokenMine is Ownable {
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
@@ -50,8 +49,9 @@ contract TokenMine is Ownable {
     // The block number when New mining finish.
     uint256 public endBlock;
 
+    bool public isWithdrawAfterEnd;
+
     string public name;
-    uint256 public miningFee;
 
     event Deposit(address indexed user, uint256 amount);
     event Withdraw(address indexed user, uint256 amount);
@@ -64,8 +64,7 @@ contract TokenMine is Ownable {
         address _rewardsToken,
         uint256 _startBlock, 
         uint256 _endBlock,
-        uint256 _rewardAmount, 
-        uint256 _miningFee
+        uint256 _rewardAmount
     ) public {
         require(_startBlock >= block.number, 'Deploy: genesis too soon');
         require(_endBlock > _startBlock, 'Deploy: endBlock must be greater than startBlock');
@@ -78,9 +77,18 @@ contract TokenMine is Ownable {
         endBlock = _endBlock;
         rewardAmount = _rewardAmount;
         rewardsTokenPerBlock = _rewardAmount.div(_endBlock.sub(_startBlock));
-        miningFee = _miningFee;
 
         transferOwnership(_owner);
+    }
+
+    function withdrawAfterEnd() public onlyOwner {
+        require(block.number > endBlock, 'withdrawAfterEnd: mining is not over');
+
+        updatePool();
+        if (!isWithdrawAfterEnd && rewardAmount.sub(rewardsTokenSupply) > 0) {
+            isWithdrawAfterEnd = true;
+            safeRewardsTokenTransfer(owner(),rewardAmount.sub(rewardsTokenSupply));
+        }
     }
 
     // Update reward variables of the pool to be up-to-date.
@@ -90,23 +98,18 @@ contract TokenMine is Ownable {
         }
         uint256 stakingSupply = stakingToken.balanceOf(address(this));
         if (stakingSupply == 0) {
-            // 当没有人挖并且还有rewardsToken未分配出去，endblock顺延对应区块数   
-            if (rewardAmount.sub(rewardsTokenSupply) >= rewardsTokenPerBlock) {
-                endBlock = endBlock.add(block.number.sub(lastRewardBlock));
-            }
-
             lastRewardBlock = block.number;
             return;
         }
 
-        uint256 tokenReward = getMultiplier(lastRewardBlock, block.number);
+        uint256 tokenReward = getReward(lastRewardBlock, block.number);
         rewardsTokenSupply = rewardsTokenSupply.add(tokenReward);
         accTokenPerShare = accTokenPerShare.add(tokenReward.mul(1e12).div(stakingSupply));
         lastRewardBlock = block.number;
     }
 
     // Return reward multiplier over the given _from to _to block.
-    function getMultiplier(uint256 _from, uint256 _to) public view returns (uint256) {
+    function getReward(uint256 _from, uint256 _to) public view returns (uint256) {
         if (_to <= endBlock) {
             return _to.sub(_from).mul(rewardsTokenPerBlock);
         } else if (_from >= endBlock) {
@@ -121,15 +124,11 @@ contract TokenMine is Ownable {
     ///////////////////////////////////////////////////
 
     // Deposit LP tokens to TokenMine for token allocation.
-    function deposit(uint256 _amount) public payable {
+    function deposit(uint256 _amount) public {
         UserInfo storage user = userInfo[msg.sender];
         updatePool();
-        if (user.amount > 0) {
-            uint256 pending = user.amount.mul(accTokenPerShare).div(1e12).sub(user.rewardDebt);
-            if(pending > 0) {
-                safeRewardsTokenTransfer(msg.sender, pending);
-            }
-        }
+        
+        uint256 pending = user.amount.mul(accTokenPerShare).div(1e12).sub(user.rewardDebt);
 
         if(_amount > 0) {
             stakingToken.safeTransferFrom(address(msg.sender), address(this), _amount);
@@ -137,10 +136,8 @@ contract TokenMine is Ownable {
         }
 
         user.rewardDebt = user.amount.mul(accTokenPerShare).div(1e12);
-
-        // 用户提现也会调用此函数，此时不收费
-        if(_amount > 0 && miningFee > 0) {
-            Address.sendValue(payable(owner()), miningFee);  
+        if(pending > 0) {
+            safeRewardsTokenTransfer(msg.sender, pending);
         }
         emit Deposit(msg.sender, _amount);        
     }
@@ -150,15 +147,18 @@ contract TokenMine is Ownable {
         UserInfo storage user = userInfo[msg.sender];
         require(user.amount >= _amount, "withdraw: not good");
         updatePool();
+
         uint256 pending = user.amount.mul(accTokenPerShare).div(1e12).sub(user.rewardDebt);
-        if(pending > 0) {
-            safeRewardsTokenTransfer(msg.sender, pending);
-        }
+
         if(_amount > 0) {
             user.amount = user.amount.sub(_amount);
             stakingToken.safeTransfer(address(msg.sender), _amount);
         }
+
         user.rewardDebt = user.amount.mul(accTokenPerShare).div(1e12);
+        if(pending > 0) {
+            safeRewardsTokenTransfer(msg.sender, pending);
+        }
         emit Withdraw(msg.sender, _amount);
     }
 
@@ -177,7 +177,7 @@ contract TokenMine is Ownable {
         uint256 accToken = accTokenPerShare;
         uint256 lpSupply = stakingToken.balanceOf(address(this));
         if (block.number > lastRewardBlock && lpSupply != 0) {
-            uint256 tokenReward = getMultiplier(lastRewardBlock, block.number);
+            uint256 tokenReward = getReward(lastRewardBlock, block.number);
             accToken = accToken.add(tokenReward.mul(1e12).div(lpSupply));
         }
         return user.amount.mul(accToken).div(1e12).sub(user.rewardDebt);
