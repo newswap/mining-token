@@ -49,7 +49,7 @@ contract TokenMine is Ownable {
     // The block number when New mining finish.
     uint256 public endBlock;
 
-    bool public isWithdrawAfterEnd;
+    bool public isOwnerWithdrawAfterEnd;
 
     string public name;
 
@@ -81,12 +81,13 @@ contract TokenMine is Ownable {
         transferOwnership(_owner);
     }
 
-    function withdrawAfterEnd() public onlyOwner {
-        require(block.number > endBlock, 'withdrawAfterEnd: mining is not over');
+    function ownerWithdrawAfterEnd() public onlyOwner {
+        require(block.number > endBlock, 'ownerWithdrawAfterEnd: mining is not over');
+        require(!isOwnerWithdrawAfterEnd, 'ownerWithdrawAfterEnd: isOwnerWithdrawAfterEnd != false');
 
         updatePool();
-        if (!isWithdrawAfterEnd && rewardAmount.sub(rewardsTokenSupply) > 0) {
-            isWithdrawAfterEnd = true;
+        if (rewardAmount.sub(rewardsTokenSupply) > 0) {
+            isOwnerWithdrawAfterEnd = true;
             safeRewardsTokenTransfer(owner(),rewardAmount.sub(rewardsTokenSupply));
         }
     }
