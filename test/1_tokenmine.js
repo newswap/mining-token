@@ -8,7 +8,7 @@ contract('TokenMine', ([alice, bob, carol, dev, minter]) => {
     beforeEach(async () => {
         this.stakingToken = await MockERC20.new('SToken', 'SToken', '100000000', { from: minter });
         this.rewardsToken = await MockERC20.new('RToken', 'RTokenSP', '100000000', { from: minter });
-        this.factory = await TokenMineFactory.new(dev, {from: minter});
+        this.factory = await TokenMineFactory.new(minter, dev, {from: minter});
         await this.factory.setFee(web3.utils.toWei('5', 'ether'), {from: minter});
 
         await this.rewardsToken.transfer(alice, '1000000', { from: minter });
@@ -29,10 +29,10 @@ contract('TokenMine', ([alice, bob, carol, dev, minter]) => {
         const devBalance = await web3.eth.getBalance(dev);
         const tx = await this.factory.deploy(name, this.stakingToken.address, 
             this.rewardsToken.address, startBlock, endBlock, rewardAmount, 
-            true, {from: alice, value: web3.utils.toWei('5', 'ether')});
+            false, {from: alice, value: web3.utils.toWei('5', 'ether')});
         // console.log(tx)
         // console.log(tx.logs[2])
-        const tokenMineAddress = tx.logs[2].args._tokenMineAddress;      
+        const tokenMineAddress = tx.logs[2].args.tokenMineAddress;      
         const aliceBalance2 = await web3.eth.getBalance(alice);
         const devBalance2 = await web3.eth.getBalance(dev);
         assert.equal(parseInt(aliceBalance/1e18-aliceBalance2/1e18), 5);
@@ -58,9 +58,9 @@ contract('TokenMine', ([alice, bob, carol, dev, minter]) => {
         // 100 per block farming rate starting at startBlock with bonus until block startBlock+1000
         const tx = await this.factory.deploy(name, this.stakingToken.address, 
             this.rewardsToken.address, startBlock, startBlock+1000, rewardAmount, 
-            true, {from: alice, value: web3.utils.toWei('5', 'ether')});
+            false, {from: alice, value: web3.utils.toWei('5', 'ether')});
 
-        this.tokenMine = await TokenMine.at(tx.logs[2].args._tokenMineAddress);
+        this.tokenMine = await TokenMine.at(tx.logs[2].args.tokenMineAddress);
         const aliceBalance = await web3.eth.getBalance(alice);
         await this.stakingToken.approve(this.tokenMine.address, '1000', { from: bob });
         
@@ -78,8 +78,8 @@ contract('TokenMine', ([alice, bob, carol, dev, minter]) => {
         // 100 per block farming rate starting at startBlock with bonus until block startBlock+500
         const tx = await this.factory.deploy(name, this.stakingToken.address, 
             this.rewardsToken.address, startBlock, startBlock+1000, rewardAmount, 
-            true, {from: alice, value: web3.utils.toWei('5', 'ether')});
-        this.tokenMine = await TokenMine.at(tx.logs[2].args._tokenMineAddress);
+            false, {from: alice, value: web3.utils.toWei('5', 'ether')});
+        this.tokenMine = await TokenMine.at(tx.logs[2].args.tokenMineAddress);
 
         await this.stakingToken.approve(this.tokenMine.address, '1000', { from: bob });
         await this.tokenMine.deposit('100', { from: bob});
@@ -113,8 +113,8 @@ contract('TokenMine', ([alice, bob, carol, dev, minter]) => {
         // 100 per block farming rate starting at startBlock with bonus until block startBlock+500
         const tx = await this.factory.deploy(name, this.stakingToken.address, 
             this.rewardsToken.address, startBlock, startBlock+1000, rewardAmount, 
-            true, {from: alice, value: web3.utils.toWei('5', 'ether')}); 
-        this.tokenMine = await TokenMine.at(tx.logs[2].args._tokenMineAddress);
+            false, {from: alice, value: web3.utils.toWei('5', 'ether')}); 
+        this.tokenMine = await TokenMine.at(tx.logs[2].args.tokenMineAddress);
         const aliceBalance = await web3.eth.getBalance(alice);
 
         await this.stakingToken.approve(this.tokenMine.address, '1000', { from: bob });
@@ -150,8 +150,8 @@ contract('TokenMine', ([alice, bob, carol, dev, minter]) => {
         // 1000 per block farming rate starting at startBlock with bonus until block startBlock+500
         const tx = await this.factory.deploy(name, this.stakingToken.address, 
             this.rewardsToken.address, startBlock, startBlock+1000, rewardAmount, 
-            true, {from: alice, value: web3.utils.toWei('5', 'ether')});
-        this.tokenMine = await TokenMine.at(tx.logs[2].args._tokenMineAddress);
+            false, {from: alice, value: web3.utils.toWei('5', 'ether')});
+        this.tokenMine = await TokenMine.at(tx.logs[2].args.tokenMineAddress);
         const aliceBalance = await web3.eth.getBalance(alice);
 
         await this.stakingToken.approve(this.tokenMine.address, '1000', { from: dev });
@@ -223,8 +223,8 @@ contract('TokenMine', ([alice, bob, carol, dev, minter]) => {
         // 1000 per block farming rate starting at startBlock with bonus until block startBlock+10
         const tx = await this.factory.deploy(name, this.stakingToken.address, 
             this.rewardsToken.address, startBlock, endBlock, rewardAmount, 
-            true, {from: alice, value: web3.utils.toWei('5', 'ether')});
-        this.tokenMine = await TokenMine.at(tx.logs[2].args._tokenMineAddress);
+            false, {from: alice, value: web3.utils.toWei('5', 'ether')});
+        this.tokenMine = await TokenMine.at(tx.logs[2].args.tokenMineAddress);
         const aliceBalance = await web3.eth.getBalance(alice);
 
         await this.stakingToken.approve(this.tokenMine.address, '1000', { from: bob });
@@ -262,9 +262,9 @@ contract('TokenMine', ([alice, bob, carol, dev, minter]) => {
         // 333 per block farming rate starting at startBlock with bonus until block startBlock+30
         const tx = await this.factory.deploy(name, this.stakingToken.address, 
             this.rewardsToken.address, startBlock, endBlock, rewardAmount, 
-            true, {from: alice, value: web3.utils.toWei('5', 'ether')});
+            false, {from: alice, value: web3.utils.toWei('5', 'ether')});
         
-        this.tokenMine = await TokenMine.at(tx.logs[2].args._tokenMineAddress);
+        this.tokenMine = await TokenMine.at(tx.logs[2].args.tokenMineAddress);
         assert.equal((await this.tokenMine.rewardsTokenPerBlock()).valueOf(), '333');
         assert.equal((await this.tokenMine.endBlock()).valueOf(), endBlock);
 
