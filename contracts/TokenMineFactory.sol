@@ -18,8 +18,8 @@ contract TokenMineFactory is Ownable {
     uint256 public fee = 100000 * 10 ** 18; 
     // fee transfer to this address
     address payable public feeAddress; 
-    // 30 days
-    uint256 public maxIntervalForStart = 30 * 28800;
+
+    uint256 public maxIntervalForStart = 30 days;
 
     address public swapFactoryAddress;
 
@@ -52,17 +52,17 @@ contract TokenMineFactory is Ownable {
     }
 
     event Deploy(address tokenMineAddress, address owner, string name, address stakingToken, 
-                    address rewardsToken, uint256 startBlock, uint256 endBlock, uint256 rewardAmount, bool isStakingLPToken);
+                    address rewardsToken, uint256 startTime, uint256 endTime, uint256 rewardAmount, bool isStakingLPToken);
     
     // deploy a tokenMine contract
     function deploy(string memory _name, 
         address _stakingToken, 
         address _rewardsToken, 
-        uint256 _startBlock, 
-        uint256 _endBlock, 
+        uint256 _startTime, 
+        uint256 _endTime, 
         uint256 _rewardAmount, 
         bool _isStakingLPToken) public payable returns (address) {
-        require(_startBlock.sub(block.number) <= maxIntervalForStart, 'Deploy: genesis too late');
+        require(_startTime.sub(block.timestamp) <= maxIntervalForStart, 'Deploy: genesis too late');
 
         if(_isStakingLPToken) {
             IUniswapV2Pair pair = IUniswapV2Pair(_stakingToken);
@@ -71,12 +71,12 @@ contract TokenMineFactory is Ownable {
             require(factory.getPair(pair.token0(),pair.token1()) == address(pair), "Deploy: stakingToken isn't LPToken");
         }
 
-        address tokenMine = address(new TokenMine(msg.sender, _name, _stakingToken, _rewardsToken, _startBlock, _endBlock, _rewardAmount));
+        address tokenMine = address(new TokenMine(msg.sender, _name, _stakingToken, _rewardsToken, _startTime, _endTime, _rewardAmount));
         IERC20(_rewardsToken).safeTransferFrom(msg.sender, tokenMine, _rewardAmount);
         Address.sendValue(feeAddress, fee);
         tokenMineCount = tokenMineCount.add(1);
         
-        emit Deploy(tokenMine, msg.sender, _name, _stakingToken, _rewardsToken, _startBlock, _endBlock, _rewardAmount, _isStakingLPToken);
+        emit Deploy(tokenMine, msg.sender, _name, _stakingToken, _rewardsToken, _startTime, _endTime, _rewardAmount, _isStakingLPToken);
 
         return tokenMine;
     }

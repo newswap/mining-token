@@ -41,29 +41,29 @@ contract('TokenMineFactory', ([alice, bob, carol, dev, minter]) => {
     it('should succeed deploy tokenMine when staking nrc6 token', async () => {
         const stakingToken = await MockERC20.new('SToken', 'SToken', '100000000', { from: minter });
         const rewardsToken = await MockERC20.new('RToken', 'RTokenSP', '100000000', { from: minter });
-        const number = await web3.eth.getBlockNumber();
+        const currentTimestamp = await time.latest();
         const name = "TokenFarm"
-        const startBlock = number+100
-        const endBlock = number+1000
-        const rewardAmount = 100
+        const startTime = parseInt(currentTimestamp)+100
+        const endTime = startTime+1000
+        const rewardAmount = 10000
 
         await expectRevert(this.factory.deploy(name, stakingToken.address, 
-            rewardsToken.address, startBlock+1000, endBlock, rewardAmount, 
+            rewardsToken.address, startTime+1000, endTime, rewardAmount, 
             false, {from: bob}),'Deploy: genesis too late');
 
         await expectRevert(this.factory.deploy(name, stakingToken.address, 
-            rewardsToken.address, startBlock, endBlock, rewardAmount, 
+            rewardsToken.address, startTime, endTime, rewardAmount, 
             false, {from: bob}),'ERC20: transfer amount exceeds balance');
 
-        await rewardsToken.transfer(bob, '1000', { from: minter });
-        await rewardsToken.approve(this.factory.address, '1000', { from: bob });
+        await rewardsToken.transfer(bob, '10000', { from: minter });
+        await rewardsToken.approve(this.factory.address, '10000', { from: bob });
         await expectRevert(this.factory.deploy(name, stakingToken.address, 
-            rewardsToken.address, startBlock, endBlock, rewardAmount, 
+            rewardsToken.address, startTime, endTime, rewardAmount, 
             false, {from: bob}),'Address: insufficient balance');
 
         const devBalance = await web3.eth.getBalance(dev);
         const tx = await this.factory.deploy(name, stakingToken.address, 
-            rewardsToken.address, startBlock, endBlock, rewardAmount, 
+            rewardsToken.address, startTime, endTime, rewardAmount, 
             false, {from: bob,value: web3.utils.toWei('5', 'ether')});
         
         // console.log(tx)
@@ -72,13 +72,13 @@ contract('TokenMineFactory', ([alice, bob, carol, dev, minter]) => {
         assert.equal(tx.logs[2].args.name, name);
         assert.equal(tx.logs[2].args.stakingToken, stakingToken.address);
         assert.equal(tx.logs[2].args.rewardsToken, rewardsToken.address);
-        assert.equal(tx.logs[2].args.startBlock, startBlock);
-        assert.equal(tx.logs[2].args.endBlock, endBlock);
+        assert.equal(tx.logs[2].args.startTime, startTime);
+        assert.equal(tx.logs[2].args.endTime, endTime);
         assert.equal(tx.logs[2].args.rewardAmount, rewardAmount);
         assert.equal(tx.logs[2].args.isStakingLPToken, false);
 
-        assert.equal(await rewardsToken.balanceOf(bob), '900');
-        assert.equal(await rewardsToken.balanceOf(tx.logs[2].args.tokenMineAddress), '100');
+        assert.equal(await rewardsToken.balanceOf(bob), '0');
+        assert.equal(await rewardsToken.balanceOf(tx.logs[2].args.tokenMineAddress), '10000');
         const devBalance2 = await web3.eth.getBalance(dev);
         assert.equal(devBalance2/1e18-devBalance/1e18, 5);
         assert.equal(await this.factory.tokenMineCount(), 1);
@@ -89,8 +89,8 @@ contract('TokenMineFactory', ([alice, bob, carol, dev, minter]) => {
         const token0 = await MockERC20.new('Token01', 'Token01', '100000000', { from: minter });
         const token1 = await MockERC20.new('Token02', 'Token02', '100000000', { from: minter });
         
-        // 本地: 0x08F5e5a1bcb13583BF4b43e7b354878E76Ac9EaF
-        const swapFactoryAddress = "0x08F5e5a1bcb13583BF4b43e7b354878E76Ac9EaF"
+        // 本地部署的UniswapV2Factory
+        const swapFactoryAddress = "0x797d06150e36164494588aE0ce06920A3C9976d2"
         await this.factory.setSwapFactoryAddress(swapFactoryAddress, {from: alice});
 
         const uniswapV2Factory = await IUniswapV2Factory.at(swapFactoryAddress);  
@@ -99,33 +99,33 @@ contract('TokenMineFactory', ([alice, bob, carol, dev, minter]) => {
         // console.log("pairAddress: " + pairAddress);
 
         const rewardsToken = await MockERC20.new('RToken', 'RTokenSP', '100000000', { from: minter });
-        const number = await web3.eth.getBlockNumber();
+        const currentTimestamp = await time.latest();
         const name = "TokenFarm"
-        const startBlock = number+100
-        const endBlock = number+1000
-        const rewardAmount = 100
+        const startTime = parseInt(currentTimestamp)+100
+        const endTime = startTime+1000
+        const rewardAmount = 10000
 
         await expectRevert(this.factory.deploy(name, token0.address, 
-            rewardsToken.address, startBlock+1000, endBlock, rewardAmount, 
+            rewardsToken.address, startTime+1000, endTime, rewardAmount, 
             true, {from: bob}),'Deploy: genesis too late');
 
         await expectRevert.unspecified(this.factory.deploy(name, token0.address, 
-            rewardsToken.address, startBlock, endBlock, rewardAmount, 
+            rewardsToken.address, startTime, endTime, rewardAmount, 
             true, {from: bob}));
 
         await expectRevert(this.factory.deploy(name, pairAddress, 
-            rewardsToken.address, startBlock, endBlock, rewardAmount, 
+            rewardsToken.address, startTime, endTime, rewardAmount, 
             true, {from: bob}),'ERC20: transfer amount exceeds balance');
 
-        await rewardsToken.transfer(bob, '1000', { from: minter });
-        await rewardsToken.approve(this.factory.address, '1000', { from: bob });
+        await rewardsToken.transfer(bob, '10000', { from: minter });
+        await rewardsToken.approve(this.factory.address, '10000', { from: bob });
         await expectRevert(this.factory.deploy(name, pairAddress, 
-            rewardsToken.address, startBlock, endBlock, rewardAmount, 
+            rewardsToken.address, startTime, endTime, rewardAmount, 
             true, {from: bob}),'Address: insufficient balance');
 
         const devBalance = await web3.eth.getBalance(dev);
         const tx = await this.factory.deploy(name, pairAddress, 
-            rewardsToken.address, startBlock, endBlock, rewardAmount, 
+            rewardsToken.address, startTime, endTime, rewardAmount, 
             true, {from: bob,value: web3.utils.toWei('5', 'ether')});
         
         // console.log(tx)
@@ -134,13 +134,13 @@ contract('TokenMineFactory', ([alice, bob, carol, dev, minter]) => {
         assert.equal(tx.logs[2].args.name, name);
         assert.equal(tx.logs[2].args.stakingToken, pairAddress);
         assert.equal(tx.logs[2].args.rewardsToken, rewardsToken.address);
-        assert.equal(tx.logs[2].args.startBlock, startBlock);
-        assert.equal(tx.logs[2].args.endBlock, endBlock);
+        assert.equal(tx.logs[2].args.startTime, startTime);
+        assert.equal(tx.logs[2].args.endTime, endTime);
         assert.equal(tx.logs[2].args.rewardAmount, rewardAmount);
         assert.equal(tx.logs[2].args.isStakingLPToken, true);
 
-        assert.equal(await rewardsToken.balanceOf(bob), '900');
-        assert.equal(await rewardsToken.balanceOf(tx.logs[2].args.tokenMineAddress), '100');
+        assert.equal(await rewardsToken.balanceOf(bob), '0');
+        assert.equal(await rewardsToken.balanceOf(tx.logs[2].args.tokenMineAddress), '10000');
         const devBalance2 = await web3.eth.getBalance(dev);
         assert.equal(devBalance2/1e18-devBalance/1e18, 5);
         assert.equal(await this.factory.tokenMineCount(), 2);

@@ -22,7 +22,7 @@ contract TokenMine is Ownable {
         //   pending reward = (user.amount * accTokenPerShare) - user.rewardDebt
         //
         // Whenever a user deposits or withdraws LP tokens to a pool. Here's what happens:
-        //   1. The pool's `accTokenPerShare` (and `lastRewardBlock`) gets updated.
+        //   1. The pool's `accTokenPerShare` (and `lastRewardTime`) gets updated.
         //   2. User receives the pending reward sent to his/her address.
         //   3. User's `amount` gets updated.
         //   4. User's `rewardDebt` gets updated.
@@ -35,19 +35,19 @@ contract TokenMine is Ownable {
 
     // Address of staking token contract.
     IERC20 public stakingToken;
-    // Last block number that New distribution occurs.
-    uint256 public lastRewardBlock;
+    // Last timestamp that New distribution occurs.
+    uint256 public lastRewardTime;
     // Accumulated rewardsToken per share, times 1e12. See below.
     uint256 public accTokenPerShare;
 
     uint256 public rewardsTokenSupply;
-    // reward tokens created per block.
-    uint256 public rewardsTokenPerBlock;
+    // reward tokens created per second.
+    uint256 public rewardsTokenPerSecond;
     // owner transfer rewardAmount
     uint256 public rewardAmount;
 
-    // The block number when New mining finish.
-    uint256 public endBlock;
+    // The timestamp when New mining finish.
+    uint256 public endTime;
 
     bool public isOwnerWithdrawAfterEnd;
 
@@ -62,27 +62,27 @@ contract TokenMine is Ownable {
         string memory _name,
         address _stakingToken,
         address _rewardsToken,
-        uint256 _startBlock, 
-        uint256 _endBlock,
+        uint256 _startTime, 
+        uint256 _endTime,
         uint256 _rewardAmount
     ) public {
-        require(_startBlock >= block.number, 'Deploy: genesis too soon');
-        require(_endBlock > _startBlock, 'Deploy: endBlock must be greater than startBlock');
-        require(_rewardAmount > 0, 'Deploy: cannot reward 0');
+        require(_startTime >= block.timestamp, 'Deploy: genesis too soon');
+        require(_endTime > _startTime, 'Deploy: endTime must be greater than startTime');
 
         name = _name;
         stakingToken = IERC20(_stakingToken);
         rewardsToken = IERC20(_rewardsToken);
-        lastRewardBlock = _startBlock;
-        endBlock = _endBlock;
+        lastRewardTime = _startTime;
+        endTime = _endTime;
         rewardAmount = _rewardAmount;
-        rewardsTokenPerBlock = _rewardAmount.div(_endBlock.sub(_startBlock));
+        rewardsTokenPerSecond = _rewardAmount.div(_endTime.sub(_startTime));
+        require(rewardsTokenPerSecond > 0, 'Deploy: cannot reward 0');
 
         transferOwnership(_owner);
     }
 
     function ownerWithdrawAfterEnd() public onlyOwner {
-        require(block.number > endBlock, 'ownerWithdrawAfterEnd: mining is not over');
+        require(block.timestamp > endTime, 'ownerWithdrawAfterEnd: mining is not over');
         require(!isOwnerWithdrawAfterEnd, 'ownerWithdrawAfterEnd: isOwnerWithdrawAfterEnd != false');
 
         updatePool();
@@ -94,29 +94,29 @@ contract TokenMine is Ownable {
 
     // Update reward variables of the pool to be up-to-date.
     function updatePool() public {
-        if (block.number <= lastRewardBlock) {
+        if (block.timestamp <= lastRewardTime) {
             return;
         }
         uint256 stakingSupply = stakingToken.balanceOf(address(this));
         if (stakingSupply == 0) {
-            lastRewardBlock = block.number;
+            lastRewardTime = block.timestamp;
             return;
         }
 
-        uint256 tokenReward = getReward(lastRewardBlock, block.number);
+        uint256 tokenReward = getReward(lastRewardTime, block.timestamp);
         rewardsTokenSupply = rewardsTokenSupply.add(tokenReward);
         accTokenPerShare = accTokenPerShare.add(tokenReward.mul(1e12).div(stakingSupply));
-        lastRewardBlock = block.number;
+        lastRewardTime = block.timestamp;
     }
 
-    // Return reward multiplier over the given _from to _to block.
+    // Return reward multiplier over the given _from to _to timestamp.
     function getReward(uint256 _from, uint256 _to) public view returns (uint256) {
-        if (_to <= endBlock) {
-            return _to.sub(_from).mul(rewardsTokenPerBlock);
-        } else if (_from >= endBlock) {
+        if (_to <= endTime) {
+            return _to.sub(_from).mul(rewardsTokenPerSecond);
+        } else if (_from >= endTime) {
             return 0;
         } else {
-            return endBlock.sub(_from).mul(rewardsTokenPerBlock);
+            return endTime.sub(_from).mul(rewardsTokenPerSecond);
         }
     }
 
@@ -177,8 +177,8 @@ contract TokenMine is Ownable {
         UserInfo storage user = userInfo[_user];
         uint256 accToken = accTokenPerShare;
         uint256 lpSupply = stakingToken.balanceOf(address(this));
-        if (block.number > lastRewardBlock && lpSupply != 0) {
-            uint256 tokenReward = getReward(lastRewardBlock, block.number);
+        if (block.timestamp > lastRewardTime && lpSupply != 0) {
+            uint256 tokenReward = getReward(lastRewardTime, block.timestamp);
             accToken = accToken.add(tokenReward.mul(1e12).div(lpSupply));
         }
         return user.amount.mul(accToken).div(1e12).sub(user.rewardDebt);

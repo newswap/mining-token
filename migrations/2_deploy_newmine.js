@@ -16,8 +16,9 @@ module.exports = async function (deployer, network, accounts) {
   // const name = "NUSDT Mining"
   // const stakingToken = "0xf8a2db7aecac5968a68677f7b1aef2dd20a03ffb" // NUSDT_NEW
   // const rewardsToken = "0xc01a73fbf1c1953d18b48518259b36d70b07f277" //nusdt
-  // const startBlock = await web3.eth.getBlockNumber() + 200; // 10分钟后开启    
-  // const endBlock = startBlock + 365*24*60*20; //挖一年 
+  // const blockInfo = await web3.eth.getBlock(await web3.eth.getBlockNumber());
+  // const startTime = parseInt(blockInfo.timestamp) + 10*60; // 10分钟后开启
+  // const endTime = startTime + 365*24*60*60; //挖一年 
   // const rewardAmount = 1000*1000000
   // const isStakingLPToken = true
 
@@ -27,7 +28,7 @@ module.exports = async function (deployer, network, accounts) {
   // // // // 授权tokenMineFactory
   // await nusdt.approve(tokenMineFactory.address, web3.utils.toWei("1000000000", 'ether'));
 
-  // const tx = await tokenMineFactory.deploy(name, stakingToken, rewardsToken, startBlock, endBlock, rewardAmount, isStakingLPToken, {value: web3.utils.toWei("100000", 'ether')})
+  // const tx = await tokenMineFactory.deploy(name, stakingToken, rewardsToken, startTime, endTime, rewardAmount, isStakingLPToken, {value: web3.utils.toWei("100000", 'ether')})
   // // console.log(tx)
   // // console.log(tx.logs[0])
   // // console.log(tx.logs[1])
@@ -36,8 +37,8 @@ module.exports = async function (deployer, network, accounts) {
   // const tokenMineAddress = tx.logs[2].args['tokenMineAddress']
   // console.log("tokenMineAddress:" + tokenMineAddress)
 
-  // testnet    block number:1037652
-  // tokenMineFactory: 0x55090157f082b48317e76c7E845987dDa168cBce
-  // NUSDT Mining _tokenMineAddress: 0x510819209D9B63511272e1Be5251418F9BEE8729
+  // testnet    block number:1267222  timestamp:1619077195
+  // tokenMineFactory: 0x10d6e4042782C2967D4e9Fb59De0606e605ab3a0
+  // NUSDT Mining _tokenMineAddress: 0xE0Cc0aBb9Ee2594188F26EC4E2587e2cC46Ce0A3
 };
 
