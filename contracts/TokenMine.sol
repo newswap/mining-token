@@ -37,7 +37,7 @@ contract TokenMine is Ownable {
     IERC20 public stakingToken;
     // Last timestamp that New distribution occurs.
     uint256 public lastRewardTime;
-    // Accumulated rewardsToken per share, times 1e12. See below.
+    // Accumulated rewardsToken per share, times 1e18. See below.
     uint256 public accTokenPerShare;
 
     uint256 public rewardsTokenSupply;
@@ -105,7 +105,7 @@ contract TokenMine is Ownable {
 
         uint256 tokenReward = getReward(lastRewardTime, block.timestamp);
         rewardsTokenSupply = rewardsTokenSupply.add(tokenReward);
-        accTokenPerShare = accTokenPerShare.add(tokenReward.mul(1e12).div(stakingSupply));
+        accTokenPerShare = accTokenPerShare.add(tokenReward.mul(1e18).div(stakingSupply));
         lastRewardTime = block.timestamp;
     }
 
@@ -129,14 +129,14 @@ contract TokenMine is Ownable {
         UserInfo storage user = userInfo[msg.sender];
         updatePool();
         
-        uint256 pending = user.amount.mul(accTokenPerShare).div(1e12).sub(user.rewardDebt);
+        uint256 pending = user.amount.mul(accTokenPerShare).div(1e18).sub(user.rewardDebt);
 
         if(_amount > 0) {
             stakingToken.safeTransferFrom(address(msg.sender), address(this), _amount);
             user.amount = user.amount.add(_amount);
         }
 
-        user.rewardDebt = user.amount.mul(accTokenPerShare).div(1e12);
+        user.rewardDebt = user.amount.mul(accTokenPerShare).div(1e18);
         if(pending > 0) {
             safeRewardsTokenTransfer(msg.sender, pending);
         }
@@ -149,14 +149,14 @@ contract TokenMine is Ownable {
         require(user.amount >= _amount, "withdraw: not good");
         updatePool();
 
-        uint256 pending = user.amount.mul(accTokenPerShare).div(1e12).sub(user.rewardDebt);
+        uint256 pending = user.amount.mul(accTokenPerShare).div(1e18).sub(user.rewardDebt);
 
         if(_amount > 0) {
             user.amount = user.amount.sub(_amount);
             stakingToken.safeTransfer(address(msg.sender), _amount);
         }
 
-        user.rewardDebt = user.amount.mul(accTokenPerShare).div(1e12);
+        user.rewardDebt = user.amount.mul(accTokenPerShare).div(1e18);
         if(pending > 0) {
             safeRewardsTokenTransfer(msg.sender, pending);
         }
@@ -179,9 +179,9 @@ contract TokenMine is Ownable {
         uint256 lpSupply = stakingToken.balanceOf(address(this));
         if (block.timestamp > lastRewardTime && lpSupply != 0) {
             uint256 tokenReward = getReward(lastRewardTime, block.timestamp);
-            accToken = accToken.add(tokenReward.mul(1e12).div(lpSupply));
+            accToken = accToken.add(tokenReward.mul(1e18).div(lpSupply));
         }
-        return user.amount.mul(accToken).div(1e12).sub(user.rewardDebt);
+        return user.amount.mul(accToken).div(1e18).sub(user.rewardDebt);
     }
 
     // Safe rewardsToken transfer function, just in case if rounding error causes pool to not have enough rewardsToken.
