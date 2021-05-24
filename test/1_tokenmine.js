@@ -188,7 +188,7 @@ contract('TokenMine', ([alice, bob, carol, dev, minter]) => {
 
         // Bob withdraws 5 LPs at time+ 130. At this point:
         //   Bob should have: 4*2/3*1000 + 2*2/6*1000 + 10*2/7*1000 = 6190
-        await time.increaseTo(timestamp+130);
+        await time.increaseTo(timestamp+129);
         await this.tokenMine.withdraw('10', { from: bob });
         assert.equal(parseInt(await time.latest()), timestamp+130)
         assert.equal((await this.tokenMine.rewardsTokenSupply()).valueOf(), '20000');
@@ -247,8 +247,8 @@ contract('TokenMine', ([alice, bob, carol, dev, minter]) => {
         assert.equal(parseInt(await time.latest()), timestamp+100)
 
         await time.increaseTo(timestamp+105);
-        assert.equal((await this.tokenMine.pendingRewardsToken(bob)).valueOf(), '5000');
         assert.equal(parseInt(await time.latest()), timestamp+105)
+        assert.equal((await this.tokenMine.pendingRewardsToken(bob)).valueOf(), '5000');
 
         // At timestamp+ 110, stop giving bonus token
         await time.increaseTo(timestamp+110);

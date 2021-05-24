@@ -43,8 +43,11 @@ contract TokenMine is Ownable {
     uint256 public rewardsTokenSupply;
     // reward tokens created per second.
     uint256 public rewardsTokenPerSecond;
-    // owner transfer rewardAmount
+    // owner transfer  amount of rewards token
     uint256 public rewardAmount;
+
+    // Miner deposit stakingToken supply
+    uint256 public stakingSupply = 0;
 
     // The timestamp when New mining finish.
     uint256 public endTime;
@@ -97,7 +100,6 @@ contract TokenMine is Ownable {
         if (block.timestamp <= lastRewardTime) {
             return;
         }
-        uint256 stakingSupply = stakingToken.balanceOf(address(this));
         if (stakingSupply == 0) {
             lastRewardTime = block.timestamp;
             return;
@@ -122,8 +124,7 @@ contract TokenMine is Ownable {
 
     // View function to see remaining rewards on frontend.
     function getRemainingRewards() external view returns (uint256) {
-        uint256 lpSupply = stakingToken.balanceOf(address(this));
-        if (block.timestamp > lastRewardTime && lpSupply != 0) {
+        if (block.timestamp > lastRewardTime && stakingSupply != 0) {
             uint256 tokenReward = getReward(lastRewardTime, block.timestamp);
             uint256 rewardsSupply = rewardsTokenSupply.add(tokenReward);
             return rewardAmount.sub(rewardsSupply);
@@ -146,6 +147,7 @@ contract TokenMine is Ownable {
         if(_amount > 0) {
             stakingToken.safeTransferFrom(address(msg.sender), address(this), _amount);
             user.amount = user.amount.add(_amount);
+            stakingSupply = stakingSupply.add(_amount);
         }
 
         user.rewardDebt = user.amount.mul(accTokenPerShare).div(1e18);
@@ -165,6 +167,7 @@ contract TokenMine is Ownable {
 
         if(_amount > 0) {
             user.amount = user.amount.sub(_amount);
+            stakingSupply = stakingSupply.sub(_amount);
             stakingToken.safeTransfer(address(msg.sender), _amount);
         }
 
@@ -180,6 +183,7 @@ contract TokenMine is Ownable {
         UserInfo storage user = userInfo[msg.sender];
         stakingToken.safeTransfer(address(msg.sender), user.amount);
         emit EmergencyWithdraw(msg.sender, user.amount);
+        stakingSupply = stakingSupply.sub(user.amount);
         user.amount = 0;
         user.rewardDebt = 0;
     }
@@ -188,10 +192,9 @@ contract TokenMine is Ownable {
     function pendingRewardsToken(address _user) external view returns (uint256) {
         UserInfo storage user = userInfo[_user];
         uint256 accToken = accTokenPerShare;
-        uint256 lpSupply = stakingToken.balanceOf(address(this));
-        if (block.timestamp > lastRewardTime && lpSupply != 0) {
+        if (block.timestamp > lastRewardTime && stakingSupply != 0) {
             uint256 tokenReward = getReward(lastRewardTime, block.timestamp);
-            accToken = accToken.add(tokenReward.mul(1e18).div(lpSupply));
+            accToken = accToken.add(tokenReward.mul(1e18).div(stakingSupply));
         }
         return user.amount.mul(accToken).div(1e18).sub(user.rewardDebt);
     }
@@ -199,6 +202,10 @@ contract TokenMine is Ownable {
     // Safe rewardsToken transfer function, just in case if rounding error causes pool to not have enough rewardsToken.
     function safeRewardsTokenTransfer(address _to, uint256 _amount) internal {
         uint256 bal = rewardsToken.balanceOf(address(this));
+        if(address(rewardsToken) == address(stakingToken)) {
+            bal = bal.sub(stakingSupply);
+        }
+
         if (_amount > bal) {
             rewardsToken.safeTransfer(_to, bal);
         } else {
