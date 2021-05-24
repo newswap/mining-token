@@ -120,6 +120,18 @@ contract TokenMine is Ownable {
         }
     }
 
+    // View function to see remaining rewards on frontend.
+    function getRemainingRewards() external view returns (uint256) {
+        uint256 lpSupply = stakingToken.balanceOf(address(this));
+        if (block.timestamp > lastRewardTime && lpSupply != 0) {
+            uint256 tokenReward = getReward(lastRewardTime, block.timestamp);
+            uint256 rewardsSupply = rewardsTokenSupply.add(tokenReward);
+            return rewardAmount.sub(rewardsSupply);
+        } else {
+            return rewardAmount.sub(rewardsTokenSupply);
+        }
+    }
+
     ///////////////////////////////////////////////////
     //       function for Miner                      //
     ///////////////////////////////////////////////////
