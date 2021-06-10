@@ -8,12 +8,15 @@ import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/utils/Address.sol";
 import './interfaces/IUniswapV2Factory.sol';
 import './interfaces/IUniswapV2Pair.sol';
+import './interfaces/IWETH.sol';
 import './TokenMine.sol';
 
 // TokenMineFactory is the deployer of tokenMine
 contract TokenMineFactory is Ownable {
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
+    // mainnet wnew address     
+    address public immutable WNEW = 0xf4905b9bc02Ce21C98Eac1803693A9357D5253bf;
     // deploy tokenMine fee, default 100000 NEW
     uint256 public fee = 100000 * 10 ** 18; 
     // fee transfer to this address
@@ -72,7 +75,13 @@ contract TokenMineFactory is Ownable {
         }
 
         address tokenMine = address(new TokenMine(msg.sender, _name, _stakingToken, _rewardsToken, _startTime, _endTime, _rewardAmount));
-        IERC20(_rewardsToken).safeTransferFrom(msg.sender, tokenMine, _rewardAmount);
+        if(_rewardsToken == WNEW) {
+            IWETH(WNEW).deposit{value: _rewardAmount}();
+            assert(IWETH(WNEW).transfer(tokenMine, _rewardAmount));
+        } else {
+            IERC20(_rewardsToken).safeTransferFrom(msg.sender, tokenMine, _rewardAmount);
+        }
+ 
         Address.sendValue(feeAddress, fee);
         tokenMineCount = tokenMineCount.add(1);
         

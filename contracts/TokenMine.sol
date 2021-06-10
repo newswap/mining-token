@@ -5,11 +5,15 @@ import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import "@openzeppelin/contracts/token/ERC20/SafeERC20.sol";
 import "@openzeppelin/contracts/math/SafeMath.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/utils/Address.sol";
+import './interfaces/IWETH.sol';
 
 // TokenMine is the user-defined mining. He can distribute token and he is a fair guy.
 contract TokenMine is Ownable {
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
+    // mainnet wnew address     
+    address public immutable WNEW = 0xf4905b9bc02Ce21C98Eac1803693A9357D5253bf;
 
     // Info of each user.
     struct UserInfo {
@@ -35,7 +39,7 @@ contract TokenMine is Ownable {
 
     // Address of staking token contract.
     IERC20 public stakingToken;
-    // Last timestamp that New distribution occurs.
+    // Last timestamp that rewardsToken distribution occurs.
     uint256 public lastRewardTime;
     // Accumulated rewardsToken per share, times 1e18. See below.
     uint256 public accTokenPerShare;
@@ -137,24 +141,35 @@ contract TokenMine is Ownable {
     //       function for Miner                      //
     ///////////////////////////////////////////////////
 
-    // Deposit LP tokens to TokenMine for token allocation.
-    function deposit(uint256 _amount) public {
-        UserInfo storage user = userInfo[msg.sender];
+
+    function depositFor(address _user, uint256 _amount) public payable {
+        UserInfo storage user = userInfo[_user];
         updatePool();
         
         uint256 pending = user.amount.mul(accTokenPerShare).div(1e18).sub(user.rewardDebt);
 
         if(_amount > 0) {
-            stakingToken.safeTransferFrom(address(msg.sender), address(this), _amount);
+            if(address(stakingToken) == WNEW) {
+                require(address(this).balance >= _amount, "deposit: insufficient balance");
+                IWETH(WNEW).deposit{value: _amount}();
+            } else {
+                stakingToken.safeTransferFrom(address(msg.sender), address(this), _amount);
+            }
+  
             user.amount = user.amount.add(_amount);
             stakingSupply = stakingSupply.add(_amount);
         }
 
         user.rewardDebt = user.amount.mul(accTokenPerShare).div(1e18);
         if(pending > 0) {
-            safeRewardsTokenTransfer(msg.sender, pending);
+            safeRewardsTokenTransfer(_user, pending);
         }
-        emit Deposit(msg.sender, _amount);        
+        emit Deposit(_user, _amount);        
+    }
+
+    // Deposit LP tokens to TokenMine for token allocation.
+    function deposit(uint256 _amount) public payable {
+        depositFor(msg.sender, _amount);
     }
 
     // Withdraw LP tokens from TokenMine.
@@ -168,7 +183,13 @@ contract TokenMine is Ownable {
         if(_amount > 0) {
             user.amount = user.amount.sub(_amount);
             stakingSupply = stakingSupply.sub(_amount);
-            stakingToken.safeTransfer(address(msg.sender), _amount);
+
+            if(address(stakingToken) == WNEW) {
+                IWETH(WNEW).withdraw(_amount);
+                Address.sendValue(msg.sender, _amount);
+            } else {
+                stakingToken.safeTransfer(address(msg.sender), _amount);
+            }
         }
 
         user.rewardDebt = user.amount.mul(accTokenPerShare).div(1e18);
@@ -181,7 +202,14 @@ contract TokenMine is Ownable {
     // Withdraw without caring about rewards. EMERGENCY ONLY.
     function emergencyWithdraw() public {
         UserInfo storage user = userInfo[msg.sender];
-        stakingToken.safeTransfer(address(msg.sender), user.amount);
+
+        if(address(stakingToken) == WNEW) {
+            IWETH(WNEW).withdraw(user.amount);
+            Address.sendValue(msg.sender, user.amount);
+        } else {
+            stakingToken.safeTransfer(address(msg.sender), user.amount);
+        }
+
         emit EmergencyWithdraw(msg.sender, user.amount);
         stakingSupply = stakingSupply.sub(user.amount);
         user.amount = 0;
@@ -206,10 +234,14 @@ contract TokenMine is Ownable {
             bal = bal.sub(stakingSupply);
         }
 
-        if (_amount > bal) {
-            rewardsToken.safeTransfer(_to, bal);
-        } else {
-            rewardsToken.safeTransfer(_to, _amount);
+        uint256 transferAmount = _amount > bal ? bal : _amount;
+        if(address(rewardsToken) == WNEW) {
+            IWETH(WNEW).withdraw(transferAmount);
+            Address.sendValue(payable(_to), transferAmount);
+        } else {            
+            rewardsToken.safeTransfer(_to, transferAmount);
         }
     }
+
+    receive () external payable { }
 }

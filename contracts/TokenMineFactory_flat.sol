@@ -649,9 +649,21 @@ interface IUniswapV2Pair {
     function initialize(address, address) external;
 }
 
+// File: contracts/interfaces/IWETH.sol
+
+pragma solidity >=0.5.0;
+
+interface IWETH {
+    function deposit() external payable;
+    function transfer(address to, uint value) external returns (bool);
+    function withdraw(uint) external;
+}
+
 // File: contracts/TokenMine.sol
 
 pragma solidity 0.6.12;
+
+
 
 
 
@@ -661,6 +673,8 @@ pragma solidity 0.6.12;
 contract TokenMine is Ownable {
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
+    // mainnet wnew address     
+    address public immutable WNEW = 0xf4905b9bc02Ce21C98Eac1803693A9357D5253bf;
 
     // Info of each user.
     struct UserInfo {
@@ -686,7 +700,7 @@ contract TokenMine is Ownable {
 
     // Address of staking token contract.
     IERC20 public stakingToken;
-    // Last timestamp that New distribution occurs.
+    // Last timestamp that rewardsToken distribution occurs.
     uint256 public lastRewardTime;
     // Accumulated rewardsToken per share, times 1e18. See below.
     uint256 public accTokenPerShare;
@@ -788,24 +802,35 @@ contract TokenMine is Ownable {
     //       function for Miner                      //
     ///////////////////////////////////////////////////
 
-    // Deposit LP tokens to TokenMine for token allocation.
-    function deposit(uint256 _amount) public {
-        UserInfo storage user = userInfo[msg.sender];
+
+    function depositFor(address _user, uint256 _amount) public payable {
+        UserInfo storage user = userInfo[_user];
         updatePool();
         
         uint256 pending = user.amount.mul(accTokenPerShare).div(1e18).sub(user.rewardDebt);
 
         if(_amount > 0) {
-            stakingToken.safeTransferFrom(address(msg.sender), address(this), _amount);
+            if(address(stakingToken) == WNEW) {
+                require(address(this).balance >= _amount, "deposit: insufficient balance");
+                IWETH(WNEW).deposit{value: _amount}();
+            } else {
+                stakingToken.safeTransferFrom(address(msg.sender), address(this), _amount);
+            }
+  
             user.amount = user.amount.add(_amount);
             stakingSupply = stakingSupply.add(_amount);
         }
 
         user.rewardDebt = user.amount.mul(accTokenPerShare).div(1e18);
         if(pending > 0) {
-            safeRewardsTokenTransfer(msg.sender, pending);
+            safeRewardsTokenTransfer(_user, pending);
         }
-        emit Deposit(msg.sender, _amount);        
+        emit Deposit(_user, _amount);        
+    }
+
+    // Deposit LP tokens to TokenMine for token allocation.
+    function deposit(uint256 _amount) public payable {
+        depositFor(msg.sender, _amount);
     }
 
     // Withdraw LP tokens from TokenMine.
@@ -819,7 +844,13 @@ contract TokenMine is Ownable {
         if(_amount > 0) {
             user.amount = user.amount.sub(_amount);
             stakingSupply = stakingSupply.sub(_amount);
-            stakingToken.safeTransfer(address(msg.sender), _amount);
+
+            if(address(stakingToken) == WNEW) {
+                IWETH(WNEW).withdraw(_amount);
+                Address.sendValue(msg.sender, _amount);
+            } else {
+                stakingToken.safeTransfer(address(msg.sender), _amount);
+            }
         }
 
         user.rewardDebt = user.amount.mul(accTokenPerShare).div(1e18);
@@ -832,7 +863,14 @@ contract TokenMine is Ownable {
     // Withdraw without caring about rewards. EMERGENCY ONLY.
     function emergencyWithdraw() public {
         UserInfo storage user = userInfo[msg.sender];
-        stakingToken.safeTransfer(address(msg.sender), user.amount);
+
+        if(address(stakingToken) == WNEW) {
+            IWETH(WNEW).withdraw(user.amount);
+            Address.sendValue(msg.sender, user.amount);
+        } else {
+            stakingToken.safeTransfer(address(msg.sender), user.amount);
+        }
+
         emit EmergencyWithdraw(msg.sender, user.amount);
         stakingSupply = stakingSupply.sub(user.amount);
         user.amount = 0;
@@ -857,12 +895,16 @@ contract TokenMine is Ownable {
             bal = bal.sub(stakingSupply);
         }
 
-        if (_amount > bal) {
-            rewardsToken.safeTransfer(_to, bal);
-        } else {
-            rewardsToken.safeTransfer(_to, _amount);
+        uint256 transferAmount = _amount > bal ? bal : _amount;
+        if(address(rewardsToken) == WNEW) {
+            IWETH(WNEW).withdraw(transferAmount);
+            Address.sendValue(payable(_to), transferAmount);
+        } else {            
+            rewardsToken.safeTransfer(_to, transferAmount);
         }
     }
+
+    receive () external payable { }
 }
 
 // File: contracts/TokenMineFactory.sol
@@ -877,10 +919,13 @@ pragma solidity 0.6.12;
 
 
 
+
 // TokenMineFactory is the deployer of tokenMine
 contract TokenMineFactory is Ownable {
     using SafeMath for uint256;
     using SafeERC20 for IERC20;
+    // mainnet wnew address     
+    address public immutable WNEW = 0xf4905b9bc02Ce21C98Eac1803693A9357D5253bf;
     // deploy tokenMine fee, default 100000 NEW
     uint256 public fee = 100000 * 10 ** 18; 
     // fee transfer to this address
@@ -939,7 +984,13 @@ contract TokenMineFactory is Ownable {
         }
 
         address tokenMine = address(new TokenMine(msg.sender, _name, _stakingToken, _rewardsToken, _startTime, _endTime, _rewardAmount));
-        IERC20(_rewardsToken).safeTransferFrom(msg.sender, tokenMine, _rewardAmount);
+        if(_rewardsToken == WNEW) {
+            IWETH(WNEW).deposit{value: _rewardAmount}();
+            assert(IWETH(WNEW).transfer(tokenMine, _rewardAmount));
+        } else {
+            IERC20(_rewardsToken).safeTransferFrom(msg.sender, tokenMine, _rewardAmount);
+        }
+ 
         Address.sendValue(feeAddress, fee);
         tokenMineCount = tokenMineCount.add(1);
         
