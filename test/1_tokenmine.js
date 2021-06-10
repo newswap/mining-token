@@ -333,4 +333,73 @@ contract('TokenMine', ([alice, bob, carol, dev, minter]) => {
         await expectRevert(this.tokenMine.ownerWithdrawAfterEnd({from: alice}),'ownerWithdrawAfterEnd: isOwnerWithdrawAfterEnd != false')
     });
 
+    it('support stake NEW and win NEW', async () => {
+        // 本地部署的WNEW   TokenMineFactory和TokenMine合约中WNEW需要修改
+        const WNEW = "0xf5ad7d8472b69b3aa8ef36e042fb3f0b640ebc6f"
+        const wnewContract = await MockERC20.at(WNEW)
+        let timestamp = parseInt(await time.latest())
+        const name = "TokenFarm"
+        const startTime = timestamp+100
+        const rewardAmount = '10000000000000000'
+
+        await expectRevert(this.factory.deploy(name, WNEW, 
+            WNEW, startTime, startTime+10, rewardAmount, 
+            false, {from: alice, value: '1000000000000000000'}),'Address: insufficient balance');
+
+        // 1e15 per second farming rate starting at startTime with bonus until startTime+100
+        const tx = await this.factory.deploy(name, WNEW, 
+            WNEW, startTime, startTime+10, rewardAmount, 
+            false, {from: alice, value: '1010000000000000000'});
+        this.tokenMine = await TokenMine.at(tx.logs[2].args.tokenMineAddress)
+        assert.equal(parseInt(await wnewContract.balanceOf(this.tokenMine.address)), 1e16)    
+
+        await expectRevert(this.tokenMine.deposit('100', { from: bob }),'deposit: insufficient balance')
+        await this.tokenMine.deposit('100', { from: bob, value: 100})
+        assert.equal(((await this.tokenMine.userInfo(bob)).amount).valueOf(), '100')
+        await expectRevert(this.tokenMine.depositFor(bob, '100', { from: alice, value: 50}),'deposit: insufficient balance')
+        await this.tokenMine.depositFor(bob, '100', { from: alice, value: 100})
+        assert.equal(((await this.tokenMine.userInfo(bob)).amount).valueOf(), '200')
+        assert.equal(((await this.tokenMine.userInfo(alice)).amount).valueOf(), '0')
+        assert.equal((await this.tokenMine.stakingSupply()).valueOf(), '200')
+        assert.equal(parseInt(await wnewContract.balanceOf(this.tokenMine.address)), '10000000000000200')    
+
+        await this.tokenMine.emergencyWithdraw({ from: bob });
+        assert.equal(((await this.tokenMine.userInfo(bob)).amount).valueOf(), '0')
+        await this.tokenMine.emergencyWithdraw({ from: alice });
+        assert.equal(((await this.tokenMine.userInfo(alice)).amount).valueOf(), '0')
+        assert.equal((await this.tokenMine.stakingSupply()).valueOf(), '0')
+        assert.equal(parseInt(await wnewContract.balanceOf(this.tokenMine.address)), 1e16)    
+
+        await this.tokenMine.deposit('100', { from: bob, value: 100})
+        await time.increaseTo(timestamp+90)
+        await this.tokenMine.deposit('0', { from: bob }); // Harvest   timestamp+90
+        assert.equal(parseInt(await time.latest()), timestamp+90)
+        assert.equal((await this.tokenMine.pendingRewardsToken(bob)).valueOf(), '0')
+        await time.increaseTo(timestamp+100)
+        await this.tokenMine.deposit('0', { from: bob }); // timestamp+100
+        assert.equal(parseInt(await time.latest()), timestamp+100)
+        assert.equal((await this.tokenMine.pendingRewardsToken(bob)).valueOf(), '0');
+
+        const bobBalance = await web3.eth.getBalance(bob);
+        await time.increaseTo(timestamp+105)
+        await this.tokenMine.depositFor(bob, '0', { from: alice }); // timestamp+105
+        assert.equal(parseInt(await time.latest()), timestamp+105)
+        const bobBalance2 = await web3.eth.getBalance(bob);
+        assert.equal(bobBalance2-bobBalance, 5*1e15);
+        assert.equal((await this.tokenMine.rewardsTokenSupply()).valueOf(), 5*1e15);
+
+        await time.increaseTo(timestamp+107)
+        assert.equal((await this.tokenMine.pendingRewardsToken(bob)).valueOf(), 2*1e15)
+        await this.tokenMine.withdraw('100', { from: bob }); // timestamp+107
+        assert.equal(parseInt(await time.latest()), timestamp+107)
+        assert.equal(((await this.tokenMine.userInfo(bob)).amount).valueOf(), '0')
+        assert.equal((await this.tokenMine.rewardsTokenSupply()).valueOf(), 7*1e15);
+        assert.equal(parseInt(await wnewContract.balanceOf(this.tokenMine.address)), '3000000000000000')    
+
+        await expectRevert(this.tokenMine.ownerWithdrawAfterEnd({from: alice}),'ownerWithdrawAfterEnd: mining is not over')
+        await time.increaseTo(timestamp+111)
+        await this.tokenMine.ownerWithdrawAfterEnd({from: alice})
+        assert.equal((await this.tokenMine.rewardsTokenSupply()).valueOf(), 7*1e15);
+        assert.equal(parseInt(await wnewContract.balanceOf(this.tokenMine.address)), '0')    
+    });
 });
