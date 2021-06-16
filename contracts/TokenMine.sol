@@ -202,18 +202,19 @@ contract TokenMine is Ownable {
     // Withdraw without caring about rewards. EMERGENCY ONLY.
     function emergencyWithdraw() public {
         UserInfo storage user = userInfo[msg.sender];
-
-        if(address(stakingToken) == WNEW) {
-            IWETH(WNEW).withdraw(user.amount);
-            Address.sendValue(msg.sender, user.amount);
-        } else {
-            stakingToken.safeTransfer(address(msg.sender), user.amount);
-        }
-
-        emit EmergencyWithdraw(msg.sender, user.amount);
-        stakingSupply = stakingSupply.sub(user.amount);
+        uint256 transferAmount = user.amount;
+        stakingSupply = stakingSupply.sub(transferAmount);
         user.amount = 0;
         user.rewardDebt = 0;
+
+        if(address(stakingToken) == WNEW) {
+            IWETH(WNEW).withdraw(transferAmount);
+            Address.sendValue(msg.sender, transferAmount);
+        } else {
+            stakingToken.safeTransfer(address(msg.sender), transferAmount);
+        }
+
+        emit EmergencyWithdraw(msg.sender, transferAmount);
     }
 
     // View function to see pending New on frontend.
